@@ -10,14 +10,43 @@ import type {
 } from '@/platform/workspace/contract';
 
 const WORKSPACE_RESTORATION_HINT_VERSION =
-    1 as const;
+    2 as const;
 
 const WORKSPACE_RESTORATION_HINT_STORAGE_KEY =
-    'educore.workspace-restoration.v1';
+    'educore.workspace-restoration.v2';
 
-export interface WorkspaceRestorationHint {
+/*
+ * TENANT and an organizational Workspace are both things a
+ * member can EXPLICITLY choose to stay on, and both must
+ * persist as a distinct, sticky preference — otherwise an
+ * admin who deliberately selects TENANT would be bounced back
+ * to their sole Organization on the very next reload (see
+ * resolveSoleOrganizationalWorkspaceTarget).
+ */
+export interface TenantWorkspaceRestorationHint {
     readonly version:
         typeof WORKSPACE_RESTORATION_HINT_VERSION;
+
+    readonly kind:
+        'tenant';
+
+    readonly membershipId:
+        CanonicalMembershipContext[
+            'membership'
+        ]['id'];
+
+    readonly tenantId:
+        CanonicalMembershipContext[
+            'tenant'
+        ]['id'];
+}
+
+export interface OrganizationalWorkspaceRestorationHint {
+    readonly version:
+        typeof WORKSPACE_RESTORATION_HINT_VERSION;
+
+    readonly kind:
+        'organizational';
 
     readonly membershipId:
         CanonicalMembershipContext[
@@ -32,6 +61,10 @@ export interface WorkspaceRestorationHint {
     readonly organizationalAssignmentId:
         OrganizationalAssignmentLocator;
 }
+
+export type WorkspaceRestorationHint =
+    | TenantWorkspaceRestorationHint
+    | OrganizationalWorkspaceRestorationHint;
 
 export type WorkspaceRestorationHintStorage =
     Pick<
@@ -112,19 +145,36 @@ function isWorkspaceRestorationHint(
         return false;
     }
 
-    return (
+    if (
         value.version
-            === WORKSPACE_RESTORATION_HINT_VERSION
-        && isNonEmptyString(
+            !== WORKSPACE_RESTORATION_HINT_VERSION
+        || ! isNonEmptyString(
             value.membershipId,
         )
-        && isNonEmptyString(
+        || ! isNonEmptyString(
             value.tenantId,
         )
-        && isNonEmptyString(
+    ) {
+        return false;
+    }
+
+    if (
+        value.kind
+            === 'tenant'
+    ) {
+        return true;
+    }
+
+    if (
+        value.kind
+            === 'organizational'
+    ) {
+        return isNonEmptyString(
             value.organizationalAssignmentId,
-        )
-    );
+        );
+    }
+
+    return false;
 }
 
 function resolveStorage(
@@ -298,31 +348,12 @@ export function persistBrowserWorkspaceRestorationHint(
     storage?:
         WorkspaceRestorationHintStorage,
 ): WorkspaceRestorationMutationResult {
-    /*
-     * TENANT is the safe baseline and needs no restoration
-     * locator. Clearing the hint also prevents an old
-     * organizational assignment from being restored after
-     * the user intentionally returns to Tenant scope.
-     */
-    if (
-        workspace.type
-            === 'TENANT'
-    ) {
-        return clearBrowserWorkspaceRestorationHint(
-            storage,
-        );
-    }
-
     if (
         ! isNonEmptyString(
             context.membership.id,
         )
         || ! isNonEmptyString(
             context.tenant.id,
-        )
-        || ! isNonEmptyString(
-            workspace
-                .organizational_assignment_id,
         )
     ) {
         return {
@@ -332,15 +363,63 @@ export function persistBrowserWorkspaceRestorationHint(
                 'invalid',
             cause:
                 new Error(
-                    'EduCore Workspace restoration requires canonical Membership, Tenant, and organizational assignment identifiers.',
+                    'EduCore Workspace restoration requires canonical Membership and Tenant identifiers.',
                 ),
         };
     }
 
-    const hint:
-        WorkspaceRestorationHint = {
+    let hint:
+        WorkspaceRestorationHint;
+
+    /*
+     * Explicitly choosing TENANT is a deliberate preference,
+     * not "no preference" — it must persist just as stickily
+     * as an organizational choice, so it is never silently
+     * overridden by the sole-Organization default on the next
+     * reload (see resolveSoleOrganizationalWorkspaceTarget).
+     */
+    if (
+        workspace.type
+            === 'TENANT'
+    ) {
+        hint = {
             version:
                 WORKSPACE_RESTORATION_HINT_VERSION,
+
+            kind:
+                'tenant',
+
+            membershipId:
+                context.membership.id,
+
+            tenantId:
+                context.tenant.id,
+        };
+    } else {
+        if (
+            ! isNonEmptyString(
+                workspace
+                    .organizational_assignment_id,
+            )
+        ) {
+            return {
+                ok:
+                    false,
+                kind:
+                    'invalid',
+                cause:
+                    new Error(
+                        'EduCore Workspace restoration requires an organizational assignment identifier.',
+                    ),
+            };
+        }
+
+        hint = {
+            version:
+                WORKSPACE_RESTORATION_HINT_VERSION,
+
+            kind:
+                'organizational',
 
             membershipId:
                 context.membership.id,
@@ -352,6 +431,7 @@ export function persistBrowserWorkspaceRestorationHint(
                 workspace
                     .organizational_assignment_id,
         };
+    }
 
     try {
         const resolvedStorage =
@@ -401,6 +481,20 @@ export function resolveWorkspaceRestorationTarget(
         return null;
     }
 
+    if (
+        hint.kind
+            === 'tenant'
+    ) {
+        return (
+            workspaces.find(
+                (workspace) =>
+                    workspace.type
+                        === 'TENANT',
+            )
+            ?? null
+        );
+    }
+
     const matches =
         workspaces.filter(
             (workspace) => {
@@ -442,4 +536,45 @@ export function resolveWorkspaceRestorationTarget(
      * Never reconstruct Workspace authority from storage.
      */
     return match;
+}
+
+/*
+ * The common case this app is built around: one
+ * Yayasan/school/pesantren Tenant with exactly one
+ * Organization underneath it. When a member has no explicit,
+ * still-valid stored preference (resolveWorkspaceRestorationTarget
+ * returned null — first login, or a stale/invalid hint), this
+ * is where they should land instead of being parked on TENANT,
+ * which otherwise shows nothing meaningful for a plain member
+ * and is confusing for an admin too (see the Langkah 1 fix in
+ * WorkspaceSwitcher/hasVisibleTenantOnlyNavigation, which keeps
+ * the switcher reachable so this default never traps anyone).
+ *
+ * Deliberately returns null — i.e. stay on TENANT — the moment
+ * there is more than one non-TENANT Workspace: a genuine
+ * multi-school Yayasan has no single correct default, so the
+ * member must choose explicitly through the switcher.
+ */
+export function resolveSoleOrganizationalWorkspaceTarget(
+    workspaces:
+        readonly WorkspaceSummary[],
+): WorkspaceSummary | null {
+    const nonTenantWorkspaces =
+        workspaces.filter(
+            (workspace) =>
+                workspace.type
+                    !== 'TENANT',
+        );
+
+    if (
+        nonTenantWorkspaces.length
+            !== 1
+    ) {
+        return null;
+    }
+
+    return (
+        nonTenantWorkspaces[0]
+        ?? null
+    );
 }

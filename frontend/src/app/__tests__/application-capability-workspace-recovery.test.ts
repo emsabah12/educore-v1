@@ -76,6 +76,37 @@ const organizationWorkspace:
             'EduCore Organization',
     };
 
+const otherOrganizationalAssignmentId =
+    '018f3b6a-7c20-7eef-8def-1234567890ab';
+
+const otherOrganizationId =
+    '018f3b6a-7c20-7ffe-8def-1234567890ab';
+
+/*
+ * A second Organization keeps this Tenant a genuine
+ * multi-Organization case, so WorkspaceContextRuntime's
+ * sole-Organization default never fires during bootstrap here
+ * — this test is specifically about Capability-driven stale
+ * recovery AFTER an explicit switch, not about that default.
+ */
+const otherOrganizationWorkspace:
+    WorkspaceSummary = {
+        type:
+            'ORGANIZATION',
+
+        organizational_assignment_id:
+            otherOrganizationalAssignmentId,
+
+        organization_id:
+            otherOrganizationId,
+
+        organization_unit_id:
+            null,
+
+        label:
+            'EduCore Other Organization',
+    };
+
 afterEach(() => {
     window.sessionStorage.clear();
 });
@@ -190,6 +221,7 @@ describe(
                                 workspaces: [
                                     tenantWorkspace,
                                     organizationWorkspace,
+                                    otherOrganizationWorkspace,
                                 ],
                             },
                         });

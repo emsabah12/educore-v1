@@ -28,10 +28,13 @@ export {
     clearBrowserWorkspaceRestorationHint,
     persistBrowserWorkspaceRestorationHint,
     readBrowserWorkspaceRestorationHint,
+    resolveSoleOrganizationalWorkspaceTarget,
     resolveWorkspaceRestorationTarget,
 } from './restoration';
 
 export type {
+    OrganizationalWorkspaceRestorationHint,
+    TenantWorkspaceRestorationHint,
     WorkspaceRestorationFailure,
     WorkspaceRestorationHint,
     WorkspaceRestorationHintStorage,

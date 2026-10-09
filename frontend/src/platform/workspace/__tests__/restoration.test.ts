@@ -256,7 +256,9 @@ describe(
                 ),
             ).toEqual({
                 version:
-                    1,
+                    2,
+                kind:
+                    'organizational',
                 membershipId,
                 tenantId,
                 organizationalAssignmentId,
@@ -282,7 +284,7 @@ describe(
             );
         });
 
-        it('clears the restoration hint when TENANT becomes current', () => {
+        it('persists an explicit sticky TENANT preference instead of clearing it', () => {
             const storage =
                 new MemoryWorkspaceStorage();
 
@@ -301,6 +303,14 @@ describe(
                 storage.getStoredValue(),
             ).not.toBeNull();
 
+            /*
+             * Explicitly choosing TENANT is a deliberate
+             * preference, not "no preference" — it must
+             * persist just as stickily as an organizational
+             * choice, so an admin who deliberately stays on
+             * TENANT is not bounced back to their sole
+             * Organization on the next reload.
+             */
             expect(
                 persistBrowserWorkspaceRestorationHint(
                     context,
@@ -319,8 +329,14 @@ describe(
             ).toEqual({
                 ok:
                     true,
-                hint:
-                    null,
+                hint: {
+                    version:
+                        2,
+                    kind:
+                        'tenant',
+                    membershipId,
+                    tenantId,
+                },
             });
         });
 
@@ -342,7 +358,9 @@ describe(
                     true,
                 hint: {
                     version:
-                        1,
+                        2,
+                    kind:
+                        'organizational',
                     membershipId,
                     tenantId,
                     organizationalAssignmentId:
@@ -404,11 +422,45 @@ describe(
             );
         });
 
+        it('resolves a TENANT restoration hint to the fresh canonical TENANT catalog object', () => {
+            const hint:
+                WorkspaceRestorationHint = {
+                    version:
+                        2,
+                    kind:
+                        'tenant',
+                    membershipId,
+                    tenantId,
+                };
+
+            const refreshedTenant:
+                WorkspaceSummary = {
+                    ...tenantWorkspace,
+                    label:
+                        'EduCore School Renamed',
+                };
+
+            expect(
+                resolveWorkspaceRestorationTarget(
+                    context,
+                    [
+                        refreshedTenant,
+                        organizationWorkspace,
+                    ],
+                    hint,
+                ),
+            ).toBe(
+                refreshedTenant,
+            );
+        });
+
         it('rejects a restoration hint created under another Membership', () => {
             const hint:
                 WorkspaceRestorationHint = {
                     version:
-                        1,
+                        2,
+                    kind:
+                        'organizational',
                     membershipId:
                         otherMembershipId,
                     tenantId,
@@ -431,7 +483,9 @@ describe(
             const hint:
                 WorkspaceRestorationHint = {
                     version:
-                        1,
+                        2,
+                    kind:
+                        'organizational',
                     membershipId,
                     tenantId:
                         otherTenantId,
@@ -454,7 +508,9 @@ describe(
             const hint:
                 WorkspaceRestorationHint = {
                     version:
-                        1,
+                        2,
+                    kind:
+                        'organizational',
                     membershipId,
                     tenantId,
                     organizationalAssignmentId:
@@ -478,7 +534,9 @@ describe(
             const hint:
                 WorkspaceRestorationHint = {
                     version:
-                        1,
+                        2,
+                    kind:
+                        'organizational',
                     membershipId,
                     tenantId,
                     organizationalAssignmentId,
@@ -554,7 +612,9 @@ describe(
             storage.overwriteStoredValue(
                 JSON.stringify({
                     version:
-                        1,
+                        2,
+                    kind:
+                        'organizational',
                     membershipId,
                     tenantId,
                     organizationalAssignmentId:

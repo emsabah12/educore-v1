@@ -24,6 +24,7 @@ import {
     clearBrowserWorkspaceRestorationHint,
     persistBrowserWorkspaceRestorationHint,
     readBrowserWorkspaceRestorationHint,
+    resolveSoleOrganizationalWorkspaceTarget,
     resolveWorkspaceRestorationTarget,
 } from '@/platform/workspace/restoration';
 import {
@@ -615,6 +616,19 @@ export function createWorkspaceContextRuntime(
                 WorkspaceContextRuntimeOptions,
             restoreHint:
                 boolean,
+            /*
+             * Separate from restoreHint: stale-Organization
+             * recovery also passes restoreHint=false (it must
+             * skip the stored hint for this cycle), but it
+             * must NEVER fall through to the sole-Organization
+             * default — that would immediately re-select the
+             * very Organization whose access was just denied.
+             * Only bootstrap() may apply this default, on
+             * both a genuinely fresh login and an ordinary
+             * reload with no stored preference.
+             */
+            allowSoleOrganizationDefault:
+                boolean,
         ): Promise<
             WorkspaceContextState
         > => {
@@ -784,48 +798,89 @@ export function createWorkspaceContextRuntime(
                 discovery,
             });
 
-            if (
-                ! restoreHint
-            ) {
-                return state;
-            }
+            let target:
+                WorkspaceSummary
+                | null =
+                    null;
 
-            const restoration =
-                readBrowserWorkspaceRestorationHint();
+            /*
+             * Only an explicit, successfully-resolved stored
+             * hint is a genuine Workspace preference. The
+             * sole-Organization default below is a property
+             * of the fresh catalog shape, not a choice the
+             * member made — it must never be written back to
+             * storage as if it were one (see
+             * persistCurrentWorkspace below).
+             */
+            let targetIsExplicitPreference =
+                false;
 
             if (
-                ! restoration.ok
+                restoreHint
             ) {
+                const restoration =
+                    readBrowserWorkspaceRestorationHint();
+
                 /*
                  * Invalid hints are already discarded by the
-                 * storage boundary.
-                 *
-                 * Storage unavailability is non-authoritative
-                 * convenience failure: remain safely at
-                 * verified TENANT.
+                 * storage boundary. Storage unavailability is
+                 * a non-authoritative convenience failure —
+                 * both fall through to the sole-Organization
+                 * default below instead of leaving everyone
+                 * stuck on TENANT.
                  */
-                return state;
-            }
+                if (
+                    restoration.ok
+                    && restoration.hint
+                        !== null
+                ) {
+                    target =
+                        resolveWorkspaceRestorationTarget(
+                            context,
+                            discovery.workspaces,
+                            restoration.hint,
+                        );
 
-            if (
-                restoration.hint
-                    === null
-            ) {
-                return state;
+                    if (
+                        target === null
+                    ) {
+                        clearRestorationHint();
+                    } else {
+                        targetIsExplicitPreference =
+                            true;
+                    }
+                }
             }
-
-            const target =
-                resolveWorkspaceRestorationTarget(
-                    context,
-                    discovery.workspaces,
-                    restoration.hint,
-                );
 
             if (
                 target === null
+                && allowSoleOrganizationDefault
             ) {
-                clearRestorationHint();
+                /*
+                 * No explicit, still-valid stored preference.
+                 * The common case this app is built around is
+                 * one Tenant with exactly one Organization
+                 * underneath it — default there instead of
+                 * parking everyone, admins included, on
+                 * TENANT. WorkspaceSwitcher stays reachable
+                 * for anyone who genuinely needs a
+                 * TENANT-only destination (see
+                 * hasVisibleTenantOnlyNavigation), so this
+                 * default never traps an admin, and a genuine
+                 * multi-Organization Tenant is left exactly
+                 * as before: on TENANT, to choose explicitly.
+                 */
+                target =
+                    resolveSoleOrganizationalWorkspaceTarget(
+                        discovery.workspaces,
+                    );
+            }
 
+            if (
+                target === null
+                || target.type
+                    === 'TENANT'
+            ) {
                 return state;
             }
 
@@ -911,6 +966,7 @@ export function createWorkspaceContextRuntime(
             if (
                 restored.status
                     === 'ready'
+                && targetIsExplicitPreference
             ) {
                 persistCurrentWorkspace(
                     context,
@@ -982,6 +1038,7 @@ export function createWorkspaceContextRuntime(
                 ),
             },
             restoreHint,
+            true,
         );
     };
 
@@ -1198,6 +1255,7 @@ export function createWorkspaceContextRuntime(
             return runDiscovery(
                 context,
                 options,
+                false,
                 false,
             );
         };
