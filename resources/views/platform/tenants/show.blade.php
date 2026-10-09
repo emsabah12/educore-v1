@@ -1,10 +1,7 @@
 @extends('platform.layouts.app', ['title' => $tenant['name'] . ' — EduCore Platform'])
 
 @section('content')
-<div class="min-h-screen">
-    @include('platform.partials.nav')
-
-    <main class="p-6 max-w-3xl">
+<main class="p-6 max-w-3xl">
         <div class="flex items-center justify-between mb-6">
             <div>
                 <h1 class="text-xl font-semibold">{{ $tenant['name'] }}</h1>
@@ -207,5 +204,4 @@
             {{ $auditLogs->links() }}
         </div>
     </main>
-</div>
 @endsection

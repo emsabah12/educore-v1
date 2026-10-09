@@ -451,6 +451,16 @@ Route::middleware([
         ->middleware('tenant.permission:hr.onboarding.manage')
         ->name('api.v1.hr.onboarding.cases.store');
 
+    // §Melengkapi gap yang menyebabkan bug "Gagal membuat Onboarding
+    // Case" -- lihat catatan lengkap di
+    // OnboardingCaseController::showForApplication().
+    Route::get(
+        '/v1/hr/recruitment/applications/{applicationId}/onboarding',
+        [OnboardingCaseController::class, 'showForApplication']
+    )
+        ->middleware('tenant.permission:hr.onboarding.view')
+        ->name('api.v1.hr.onboarding.cases.show_for_application');
+
     Route::post(
         '/v1/hr/onboarding/cases/{caseId}/start',
         [OnboardingCaseController::class, 'start']

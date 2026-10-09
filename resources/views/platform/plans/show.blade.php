@@ -1,10 +1,7 @@
 @extends('platform.layouts.app', ['title' => $plan->name . ' — EduCore Platform'])
 
 @section('content')
-<div class="min-h-screen">
-    @include('platform.partials.nav')
-
-    <main class="p-6 max-w-2xl">
+<main class="p-6 max-w-2xl">
         <div class="flex items-center justify-between mb-6">
             <div>
                 <h1 class="text-xl font-semibold">{{ $plan->name }}</h1>
@@ -86,5 +83,4 @@
             </button>
         </form>
     </main>
-</div>
 @endsection

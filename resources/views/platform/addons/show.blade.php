@@ -1,10 +1,7 @@
 @extends('platform.layouts.app', ['title' => $addon->name . ' — EduCore Platform'])
 
 @section('content')
-<div class="min-h-screen">
-    @include('platform.partials.nav')
-
-    <main class="p-6 max-w-xl">
+<main class="p-6 max-w-xl">
         <div class="flex items-center justify-between mb-6">
             <div>
                 <h1 class="text-xl font-semibold">{{ $addon->name }}</h1>
@@ -66,5 +63,4 @@
             </button>
         </form>
     </main>
-</div>
 @endsection

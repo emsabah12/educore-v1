@@ -1,10 +1,7 @@
 @extends('platform.layouts.app', ['title' => 'Add-on — EduCore Platform'])
 
 @section('content')
-<div class="min-h-screen">
-    @include('platform.partials.nav')
-
-    <main class="p-6">
+<main class="p-6">
         <div class="flex items-center justify-between mb-4">
             <h1 class="text-xl font-semibold">Add-on</h1>
             <a
@@ -61,5 +58,4 @@
             </table>
         </div>
     </main>
-</div>
 @endsection

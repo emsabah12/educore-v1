@@ -1,10 +1,7 @@
 @extends('platform.layouts.app', ['title' => 'Add-on Baru — EduCore Platform'])
 
 @section('content')
-<div class="min-h-screen">
-    @include('platform.partials.nav')
-
-    <main class="p-6 max-w-xl">
+<main class="p-6 max-w-xl">
         <h1 class="text-xl font-semibold mb-6">Buat Add-on Baru</h1>
 
         @if ($errors->any())
@@ -65,5 +62,4 @@
             </div>
         </form>
     </main>
-</div>
 @endsection

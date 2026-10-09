@@ -1,10 +1,7 @@
 @extends('platform.layouts.app', ['title' => 'Log Aktivitas — EduCore Platform'])
 
 @section('content')
-<div class="min-h-screen">
-    @include('platform.partials.nav')
-
-    <main class="p-6">
+<main class="p-6">
         <h1 class="text-xl font-semibold mb-4">Log Aktivitas Platform</h1>
 
         <form method="GET" action="{{ route('platform.audit-logs.index') }}" class="flex flex-wrap items-end gap-3 mb-4">
@@ -71,5 +68,4 @@
             {{ $logs->links() }}
         </div>
     </main>
-</div>
 @endsection

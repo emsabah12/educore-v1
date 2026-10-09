@@ -1,10 +1,7 @@
 @extends('platform.layouts.app', ['title' => 'Role & Permission — EduCore Platform'])
 
 @section('content')
-<div class="min-h-screen">
-    @include('platform.partials.nav')
-
-    <main class="p-6">
+<main class="p-6">
         <div class="flex items-center justify-between mb-4">
             <div>
                 <h1 class="text-xl font-semibold">Katalog Role &amp; Permission</h1>
@@ -58,5 +55,4 @@
             </table>
         </div>
     </main>
-</div>
 @endsection

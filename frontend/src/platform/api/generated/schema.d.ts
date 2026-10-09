@@ -1791,7 +1791,16 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Retrieve the Onboarding Case already attached to an Application, if any
+         * @description Lets the frontend check whether an Application already has an
+         *     Onboarding Case BEFORE offering the "start onboarding" form
+         *     again -- an Application can only ever have one Onboarding
+         *     Case (POST on this same path returns 409 on a second
+         *     attempt), and without this endpoint the frontend had no way
+         *     to discover an already-existing Case after a page reload.
+         */
+        get: operations["hrRecruitmentApplicationOnboardingCaseShow"];
         put?: never;
         /**
          * Create an Onboarding Case for a hired Application, optionally from a Template
@@ -10850,6 +10859,62 @@ export interface operations {
                 };
             };
             422: components["responses"]["ValidationFailed"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    hrRecruitmentApplicationOnboardingCaseShow: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description UUIDv7 tab-local locator used only when a canonical operation is
+                 *     authenticated with BrowserSessionAuth. It selects one Membership
+                 *     credential already prepared in server-side Browser Session custody.
+                 *
+                 *     Omit this header for BearerAuth. The header is never authentication or
+                 *     authorization authority and cannot create a Membership context.
+                 */
+                "X-EduCore-Membership-Id"?: components["parameters"]["CanonicalBrowserMembershipLocator"];
+            };
+            path: {
+                applicationId: components["schemas"]["UuidV7"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The Onboarding Case already attached to this Application, with its tasks. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingCaseSingleSuccess"];
+                };
+            };
+            401: components["responses"]["BrowserSessionAuthenticationRequired"];
+            /**
+             * @description Authentication or Browser Session Membership context is
+             *     missing, unavailable, or mismatched, or the current tenant
+             *     membership does not have hr.onboarding.view permission.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationContextDeniedError"] | components["schemas"]["SubscriptionFeatureNotAvailableError"] | components["schemas"]["AuthorizationDeniedError"];
+                };
+            };
+            /** @description This Application does not have an Onboarding Case yet. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OnboardingCaseNotFoundError"];
+                };
+            };
             500: components["responses"]["InternalServerError"];
         };
     };

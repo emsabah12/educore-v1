@@ -1,4 +1,4 @@
-@extends('platform.layouts.app', ['title' => 'Masuk — EduCore Platform'])
+@extends('platform.layouts.guest', ['title' => 'Masuk — EduCore Platform'])
 
 @section('content')
 <div class="min-h-screen flex items-center justify-center px-4">

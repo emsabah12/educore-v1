@@ -16,6 +16,7 @@ use Modules\HR\Exceptions\OnboardingLifecycleException;
 use Modules\HR\Http\Requests\CancelOnboardingCaseRequest;
 use Modules\HR\Http\Requests\FinalizeOnboardingTaskRequest;
 use Modules\HR\Http\Requests\StoreOnboardingCaseRequest;
+use Modules\HR\Models\OnboardingCase;
 use Modules\HR\Models\OnboardingTask;
 use Modules\HR\Services\OnboardingCaseLifecycleService;
 use Symfony\Component\HttpFoundation\Response;
@@ -77,6 +78,46 @@ final class OnboardingCaseController extends Controller
             'message' => 'Onboarding Case created.',
             'data' => $case->load('tasks'),
         ], 201);
+    }
+
+    /**
+     * §Melengkapi gap yang menyebabkan bug "Gagal membuat Onboarding
+     * Case" -- OnboardingTriggerForm (frontend) SEBELUMNYA tidak
+     * pernah bisa tahu apakah sebuah Application SUDAH punya
+     * Onboarding Case (state hasil create() hanya hidup di React
+     * state lokal, hilang setelah refresh). Endpoint ini membiarkan
+     * frontend CEK dulu sebelum menampilkan form "Mulai Onboarding"
+     * lagi -- kalau Case sudah ada, tampilkan itu langsung, bukan
+     * coba create() lagi (yang PASTI gagal karena application_id
+     * unik per Onboarding Case).
+     */
+    public function showForApplication(
+        Request $request,
+        string $applicationId,
+    ): JsonResponse {
+        $tenantId = $request->attributes->get(
+            'authenticated_tenant_id',
+        );
+
+        if (! $this->isCanonicalUuid($tenantId)) {
+            return $this->authenticationContextDeniedResponse();
+        }
+
+        $case = OnboardingCase::query()
+            ->where('application_id', $applicationId)
+            ->with('tasks')
+            ->first();
+
+        if ($case === null) {
+            return $this->notFoundResponse(
+                sprintf('Application [%s] does not have an Onboarding Case yet.', $applicationId),
+            );
+        }
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $case,
+        ]);
     }
 
     public function start(Request $request, string $caseId): JsonResponse

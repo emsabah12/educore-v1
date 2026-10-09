@@ -6133,6 +6133,63 @@ paths:
           $ref: "#/components/responses/InternalServerError"
 
   /api/v1/hr/recruitment/applications/{applicationId}/onboarding:
+    get:
+      operationId: hrRecruitmentApplicationOnboardingCaseShow
+      x-laravel-route-name: api.v1.hr.onboarding.cases.show_for_application
+      tags:
+        - Human Resources
+      summary: Retrieve the Onboarding Case already attached to an Application, if any
+      description: |
+        Lets the frontend check whether an Application already has an
+        Onboarding Case BEFORE offering the "start onboarding" form
+        again -- an Application can only ever have one Onboarding
+        Case (POST on this same path returns 409 on a second
+        attempt), and without this endpoint the frontend had no way
+        to discover an already-existing Case after a page reload.
+      security:
+        - BearerAuth: []
+        - BrowserSessionAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CanonicalBrowserMembershipLocator"
+        - name: applicationId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/UuidV7"
+      responses:
+        "200":
+          description: The Onboarding Case already attached to this Application, with its tasks.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingCaseSingleSuccess"
+
+        "401":
+          $ref: "#/components/responses/BrowserSessionAuthenticationRequired"
+
+        "403":
+          description: |
+            Authentication or Browser Session Membership context is
+            missing, unavailable, or mismatched, or the current tenant
+            membership does not have hr.onboarding.view permission.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/AuthenticationContextDeniedError"
+                  - $ref: "#/components/schemas/SubscriptionFeatureNotAvailableError"
+                  - $ref: "#/components/schemas/AuthorizationDeniedError"
+
+        "404":
+          description: This Application does not have an Onboarding Case yet.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OnboardingCaseNotFoundError"
+
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
     post:
       operationId: hrRecruitmentApplicationOnboardingCaseStore
       x-laravel-route-name: api.v1.hr.onboarding.cases.store

@@ -12,6 +12,7 @@ use Modules\Core\Support\Uuid\UuidV7;
 use Modules\Core\Tenancy\Contracts\TenantContextInterface;
 use Modules\HR\Database\Seeders\HrAuthorizationCatalogSeeder;
 use Modules\HR\Models\RecruitmentVacancy;
+use Symfony\Component\HttpFoundation\Response;
 use Tests\Support\GrantsAuthorizationRole;
 use Tests\TestCase;
 
@@ -136,6 +137,72 @@ final class OnboardingControllerTest extends TestCase
         $response
             ->assertCreated()
             ->assertJsonPath('data.status', 'NOT_STARTED');
+    }
+
+    /**
+     * §Melengkapi gap yang menyebabkan bug "Gagal membuat Onboarding
+     * Case" saat mengulang klik 'Mulai Onboarding' untuk Lamaran yang
+     * SUDAH punya Case (mis. setelah refresh halaman) -- lihat
+     * catatan lengkap di
+     * OnboardingCaseController::showForApplication().
+     */
+    public function test_show_for_application_returns_the_existing_case_with_tasks(): void
+    {
+        $this->grantRole($this->operatorMembershipId, HrAuthorizationCatalogSeeder::HR_OFFICER_ROLE);
+
+        $templateResponse = $this
+            ->withToken($this->issueToken())
+            ->postJson(
+                route('api.v1.hr.onboarding.templates.store', [], false),
+                [
+                    'code' => 'SHOW-FOR-APPLICATION-CHECK',
+                    'name' => 'Onboarding Guru — Cek Show For Application',
+                    'tasks' => [
+                        ['code' => 'SUBMIT_ID_CARD', 'title' => 'Kumpulkan KTP', 'category' => 'DOCUMENT', 'sequence' => 1],
+                    ],
+                ],
+            );
+
+        $templateId = $templateResponse->json('data.id');
+        $applicationId = $this->createApplicationFixture();
+
+        $this->withToken($this->issueToken())->postJson(
+            route('api.v1.hr.onboarding.cases.store', ['applicationId' => $applicationId], false),
+            ['template_id' => $templateId],
+        )->assertCreated();
+
+        $response = $this
+            ->withToken($this->issueToken())
+            ->getJson(
+                route('api.v1.hr.onboarding.cases.show_for_application', ['applicationId' => $applicationId], false),
+            );
+
+        $response->assertOk();
+        $response->assertJsonPath('data.application_id', $applicationId);
+        $response->assertJsonPath('data.status', 'NOT_STARTED');
+
+        $this->assertCount(
+            1,
+            $response->json('data.tasks'),
+            'The existing Case\'s tasks (snapshotted from the Template) must be included, so the frontend can render OnboardingCaseManager directly without needing to create a new Case.',
+        );
+    }
+
+    public function test_show_for_application_returns_not_found_when_no_case_exists_yet(): void
+    {
+        $this->grantRole($this->operatorMembershipId, HrAuthorizationCatalogSeeder::HR_OFFICER_ROLE);
+
+        $applicationId = $this->createApplicationFixture();
+
+        $response = $this
+            ->withToken($this->issueToken())
+            ->getJson(
+                route('api.v1.hr.onboarding.cases.show_for_application', ['applicationId' => $applicationId], false),
+            );
+
+        $response
+            ->assertStatus(Response::HTTP_NOT_FOUND)
+            ->assertJsonPath('code', 'ONBOARDING_CASE_NOT_FOUND');
     }
 
     public function test_full_task_lifecycle_advances_case_to_ready_for_activation(): void
