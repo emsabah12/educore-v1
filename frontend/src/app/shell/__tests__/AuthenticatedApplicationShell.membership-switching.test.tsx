@@ -20,6 +20,9 @@ import type {
     BrowserAuthState,
 } from '@/platform/auth';
 import type {
+    CapabilityState,
+} from '@/platform/authorization';
+import type {
     MembershipContextRuntime,
     MembershipContextState,
 } from '@/platform/membership';
@@ -61,6 +64,9 @@ const mocks =
         workspace:
             WorkspaceContextState;
 
+        capability:
+            CapabilityState;
+
         switchMembership:
             ReturnType<
                 typeof vi.fn<
@@ -80,6 +86,11 @@ const mocks =
             },
 
             workspace: {
+                status:
+                    'unresolved',
+            },
+
+            capability: {
                 status:
                     'unresolved',
             },
@@ -121,6 +132,21 @@ vi.mock(
         useWorkspaceContextState:
             () =>
                 mocks.workspace,
+    }),
+);
+
+/*
+ * This suite's fixture has a single (TENANT-only) Workspace, so
+ * the real WorkspaceSwitcher it renders bails out before ever
+ * consulting Capability state — but the hook call itself still
+ * requires a Provider/mock to exist, hence this stub.
+ */
+vi.mock(
+    '@/app/authorization/CapabilityContextProvider',
+    () => ({
+        useCapabilityState:
+            () =>
+                mocks.capability,
     }),
 );
 

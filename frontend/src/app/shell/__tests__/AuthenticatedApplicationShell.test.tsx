@@ -20,6 +20,12 @@ import type {
     BrowserAuthState,
 } from '@/platform/auth';
 import type {
+    CapabilityState,
+} from '@/platform/authorization';
+import type {
+    MembershipContextState,
+} from '@/platform/membership';
+import type {
     WorkspaceContextState,
 } from '@/platform/workspace';
 
@@ -40,8 +46,14 @@ const mocks =
         authentication:
             BrowserAuthState;
 
+        membership:
+            MembershipContextState;
+
         workspace:
             WorkspaceContextState;
+
+        capability:
+            CapabilityState;
     }>(
         () => ({
             authentication: {
@@ -49,7 +61,17 @@ const mocks =
                     'unknown',
             },
 
+            membership: {
+                status:
+                    'unresolved',
+            },
+
             workspace: {
+                status:
+                    'unresolved',
+            },
+
+            capability: {
                 status:
                     'unresolved',
             },
@@ -66,11 +88,39 @@ vi.mock(
 );
 
 vi.mock(
+    '@/app/membership/MembershipContextProvider',
+    () => ({
+        useMembershipContextState:
+            () =>
+                mocks.membership,
+    }),
+);
+
+vi.mock(
     '@/app/workspace/WorkspaceContextProvider',
     () => ({
         useWorkspaceContextState:
             () =>
                 mocks.workspace,
+    }),
+);
+
+/*
+ * WorkspaceSwitcher (rendered for real by this shell-focused
+ * suite, unlike MembershipSwitcher/ApplicationNavigation below)
+ * now also reads Capability state to decide whether it should
+ * stay hidden for a single-Organization tenant. This suite does
+ * not exercise that decision — AuthenticatedApplicationShell.*
+ * -switching.test.tsx does — so an 'unresolved' Capability
+ * snapshot is enough to satisfy the hook without a real
+ * CapabilityContextProvider.
+ */
+vi.mock(
+    '@/app/authorization/CapabilityContextProvider',
+    () => ({
+        useCapabilityState:
+            () =>
+                mocks.capability,
     }),
 );
 

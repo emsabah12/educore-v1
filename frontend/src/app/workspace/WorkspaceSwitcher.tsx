@@ -3,6 +3,18 @@ import type {
 } from 'react';
 
 import {
+    useBrowserAuthState,
+} from '@/app/auth/BrowserAuthProvider';
+import {
+    useCapabilityState,
+} from '@/app/authorization/CapabilityContextProvider';
+import {
+    useMembershipContextState,
+} from '@/app/membership/MembershipContextProvider';
+import {
+    hasVisibleTenantOnlyNavigation,
+} from '@/app/workspace/tenant-admin-visibility';
+import {
     useWorkspaceContextRuntime,
     useWorkspaceContextState,
 } from '@/app/workspace/WorkspaceContextProvider';
@@ -187,6 +199,15 @@ export function WorkspaceSwitcher() {
     const workspace =
         useWorkspaceContextState();
 
+    const authentication =
+        useBrowserAuthState();
+
+    const membership =
+        useMembershipContextState();
+
+    const capability =
+        useCapabilityState();
+
     if (
         workspace.status
             !== 'ready'
@@ -205,6 +226,36 @@ export function WorkspaceSwitcher() {
     if (
         workspace.workspaces.length
             <= 1
+    ) {
+        return null;
+    }
+
+    /*
+     * TENANT + exactly one Organization is the common
+     * single-school/single-pesantren tenant shape.
+     *
+     * For a Membership with nothing tenant-admin-only to reach
+     * there (Kelola Anggota, Organisasi, or any future
+     * tenant-admin-only destination), offering a choice between
+     * "the only Organization" and "a Tenant Workspace that
+     * shows nothing extra for them" is pure friction, not a
+     * real choice — so the switcher stays hidden.
+     *
+     * A Membership that DOES have tenant-admin-only access
+     * keeps seeing the switcher: hiding it would strand them
+     * away from Kelola Anggota/Organisasi with no way back (see
+     * ProtectedRouteStateView's 'context-required' state, which
+     * has no built-in recovery action of its own).
+     */
+    if (
+        workspace.workspaces.length
+            === 2
+        && ! hasVisibleTenantOnlyNavigation({
+            authentication,
+            membership,
+            capability,
+            workspace,
+        })
     ) {
         return null;
     }

@@ -20,6 +20,9 @@ import type {
     BrowserAuthState,
 } from '@/platform/auth';
 import type {
+    CapabilityState,
+} from '@/platform/authorization';
+import type {
     MembershipContextRuntime,
     MembershipContextState,
 } from '@/platform/membership';
@@ -67,6 +70,9 @@ const mocks =
         workspace:
             WorkspaceContextState;
 
+        capability:
+            CapabilityState;
+
         switchMembership:
             ReturnType<
                 typeof vi.fn<
@@ -93,6 +99,11 @@ const mocks =
             },
 
             workspace: {
+                status:
+                    'unresolved',
+            },
+
+            capability: {
                 status:
                     'unresolved',
             },
@@ -145,6 +156,23 @@ vi.mock(
                 switchWorkspace:
                     mocks.switchWorkspace,
             }),
+    }),
+);
+
+/*
+ * This suite exercises the REAL WorkspaceSwitcher, which now
+ * also consults Capability state to decide whether a
+ * TENANT + single-Organization catalog should stay visible. The
+ * fixture below grants tenant-admin so that decision resolves
+ * to "keep visible", matching what this suite's test names
+ * assert.
+ */
+vi.mock(
+    '@/app/authorization/CapabilityContextProvider',
+    () => ({
+        useCapabilityState:
+            () =>
+                mocks.capability,
     }),
 );
 
@@ -363,6 +391,42 @@ function configureWorkspaceCatalog(): void {
 
         failure:
             null,
+    };
+
+    /*
+     * tenant-admin here keeps the switcher visible for THIS
+     * suite's TENANT + 1-Organization fixture, consistent with
+     * what every test below asserts ("exposes... when more than
+     * one Workspace is available"). The hidden-for-non-admin
+     * case has its own dedicated coverage in
+     * tenant-admin-visibility.test.ts / WorkspaceSwitcher's own
+     * test file.
+     */
+    mocks.capability = {
+        status:
+            'ready',
+
+        projection: {
+            scope: {
+                type:
+                    'tenant',
+
+                tenant_id:
+                    tenantId,
+
+                membership_id:
+                    membershipId,
+            },
+
+            is_global_superadmin:
+                false,
+
+            is_tenant_admin:
+                true,
+
+            permissions:
+                [],
+        },
     };
 
     mocks.switchMembership
