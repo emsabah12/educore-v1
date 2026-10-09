@@ -225,6 +225,11 @@ Route::middleware([
         '/',
         [OrganizationManagementController::class, 'store'],
     )->name('api.v1.core.organizations.store');
+
+    Route::put(
+        '/{organization}',
+        [OrganizationManagementController::class, 'update'],
+    )->name('api.v1.core.organizations.update');
 });
 
 /*

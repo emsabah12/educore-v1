@@ -28,6 +28,14 @@ import {
 export type StoreOrganizationInput =
     ApiComponents['schemas']['StoreOrganizationRequest'];
 
+export type UpdateOrganizationInput =
+    ApiComponents['schemas']['UpdateOrganizationRequest'];
+
+export interface UpdateOrganizationVariables {
+    organizationId: string;
+    input: UpdateOrganizationInput;
+}
+
 function useMembershipId(): string | null {
     const workspaceState =
         useWorkspaceContextState();
@@ -92,6 +100,86 @@ export function useCreateOrganizationMutation(): UseMutationResult<
             if (result.data === undefined) {
                 throw new Error(
                     'Create organization response was empty.',
+                );
+            }
+
+            return result.data.data;
+        },
+
+        onSuccess: () => {
+            void queryClient.invalidateQueries(
+                {
+                    queryKey:
+                        organizationsQueryKey,
+                },
+            );
+        },
+    });
+}
+
+export function useUpdateOrganizationMutation(): UseMutationResult<
+    OrganizationResource,
+    BrowserApiFailure,
+    UpdateOrganizationVariables
+> {
+    const apiClient =
+        useApiClient();
+
+    const membershipId =
+        useMembershipId();
+
+    const queryClient =
+        useQueryClient();
+
+    return useMutation<
+        OrganizationResource,
+        BrowserApiFailure,
+        UpdateOrganizationVariables
+    >({
+        mutationFn: async (
+            {
+                organizationId,
+                input,
+            },
+        ) => {
+            if (membershipId === null) {
+                throw new Error(
+                    'useUpdateOrganizationMutation executed without a ready Membership context.',
+                );
+            }
+
+            const result =
+                await executeBrowserApiRequest(
+                    apiClient.PUT(
+                        '/api/v1/core/organizations/{organization}',
+                        {
+                            params: {
+                                header:
+                                    createBrowserMembershipHeaderParams(
+                                        {
+                                            membershipId,
+                                        },
+                                    ),
+
+                                path: {
+                                    organization:
+                                        organizationId,
+                                },
+                            },
+
+                            body:
+                                input,
+                        },
+                    ),
+                );
+
+            if (! result.ok) {
+                throw result;
+            }
+
+            if (result.data === undefined) {
+                throw new Error(
+                    'Update organization response was empty.',
                 );
             }
 

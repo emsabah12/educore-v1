@@ -2441,6 +2441,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/core/organizations/{organization}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Rename one Organization belonging to the current tenant
+         * @description Only `name` is editable here — this is a dedicated rename
+         *     action, not a general PATCH of every Organization
+         *     attribute. Lets an admin rename the Organization that
+         *     TenantActivationService auto-creates on tenant activation
+         *     (named after the Tenant) into the real school/unit name,
+         *     instead of leaving it unused and creating a second
+         *     Organization. An organization id that does not exist, or
+         *     that belongs to a different tenant, always returns 404,
+         *     identical to a non-existent one. Requires
+         *     organization.manage permission.
+         */
+        put: operations["coreOrganizationUpdate"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/core/organizations/{organization}/units": {
         parameters: {
             query?: never;
@@ -4562,6 +4591,13 @@ export interface components {
             name: string;
             /** @description Unik per tenant (bukan global). Boleh dikosongkan. */
             code?: string | null;
+        };
+        UpdateOrganizationRequest: {
+            /**
+             * @description Trimmed before validation. No uniqueness constraint,
+             *     consistent with StoreOrganizationRequest.
+             */
+            name: string;
         };
         OrganizationUnitResource: {
             id: components["schemas"]["UuidV7"];
@@ -13117,6 +13153,58 @@ export interface operations {
                     "application/json": components["schemas"]["AuthenticationContextDeniedError"] | components["schemas"]["AuthorizationDeniedError"];
                 };
             };
+            422: components["responses"]["ValidationFailed"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    coreOrganizationUpdate: {
+        parameters: {
+            query?: never;
+            header?: {
+                /**
+                 * @description UUIDv7 tab-local locator used only when a canonical operation is
+                 *     authenticated with BrowserSessionAuth. It selects one Membership
+                 *     credential already prepared in server-side Browser Session custody.
+                 *
+                 *     Omit this header for BearerAuth. The header is never authentication or
+                 *     authorization authority and cannot create a Membership context.
+                 */
+                "X-EduCore-Membership-Id"?: components["parameters"]["CanonicalBrowserMembershipLocator"];
+            };
+            path: {
+                organization: components["schemas"]["UuidV7"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateOrganizationRequest"];
+            };
+        };
+        responses: {
+            /** @description The renamed Organization. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationDetailSuccess"];
+                };
+            };
+            401: components["responses"]["BrowserSessionAuthenticationRequired"];
+            /**
+             * @description Authentication context missing/invalid, or the current
+             *     Membership does not have organization.manage permission.
+             */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthenticationContextDeniedError"] | components["schemas"]["AuthorizationDeniedError"];
+                };
+            };
+            404: components["responses"]["ResourceNotFound"];
             422: components["responses"]["ValidationFailed"];
             500: components["responses"]["InternalServerError"];
         };

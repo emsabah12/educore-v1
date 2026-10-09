@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Modules\Core\Http\Responses\ApiErrorResponse;
 use Modules\Core\Organization\Http\Requests\StoreOrganizationRequest;
+use Modules\Core\Organization\Http\Requests\UpdateOrganizationRequest;
 use Modules\Core\Organization\Models\Organization;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -69,6 +70,44 @@ final class OrganizationManagementController extends Controller
         );
     }
 
+    /**
+     * Rename satu Organization. Sengaja hanya `name` — lihat
+     * catatan arsitektur di UpdateOrganizationRequest. Organization
+     * yang tidak ditemukan ATAU bukan milik tenant saat ini
+     * mengembalikan respons 404 yang identik (lihat
+     * organizationNotFoundResponse()).
+     */
+    public function update(
+        UpdateOrganizationRequest $request,
+        string $organization,
+    ): JsonResponse {
+        $tenantId = $this->currentTenantId($request);
+
+        if (! $this->isCanonicalUuid($tenantId)) {
+            return $this->authenticationContextDeniedResponse();
+        }
+
+        $organizationModel = $this->requireOrganization(
+            $organization,
+            $tenantId,
+        );
+
+        if ($organizationModel === null) {
+            return $this->organizationNotFoundResponse();
+        }
+
+        $organizationModel->update([
+            'name' => $request->string('name')->toString(),
+        ]);
+
+        return response()->json([
+            'status' => 'success',
+            'data' => $this->summary(
+                $organizationModel->refresh(),
+            ),
+        ]);
+    }
+
     private function currentTenantId(Request $request): string
     {
         $tenantId = $request->attributes->get(
@@ -76,6 +115,22 @@ final class OrganizationManagementController extends Controller
         );
 
         return is_string($tenantId) ? $tenantId : '';
+    }
+
+    private function requireOrganization(
+        string $organizationId,
+        string $tenantId,
+    ): ?Organization {
+        $organizationId = trim($organizationId);
+
+        if (! Str::isUuid($organizationId)) {
+            return null;
+        }
+
+        return Organization::query()
+            ->whereKey($organizationId)
+            ->where('tenant_id', $tenantId)
+            ->first();
     }
 
     /**
@@ -94,6 +149,22 @@ final class OrganizationManagementController extends Controller
             code: 'AUTHENTICATION_CONTEXT_DENIED',
             message: 'Authentication context missing or invalid.',
             status: Response::HTTP_FORBIDDEN,
+        );
+    }
+
+    /**
+     * Organization tidak ditemukan ATAU bukan milik tenant saat ini
+     * selalu mengembalikan respons yang identik — eksistensi
+     * Organization milik tenant lain tidak boleh bisa dibedakan
+     * lewat status code (pola sama seperti
+     * OrganizationUnitManagementController).
+     */
+    private function organizationNotFoundResponse(): JsonResponse
+    {
+        return ApiErrorResponse::make(
+            code: 'RESOURCE_NOT_FOUND',
+            message: 'The requested organization was not found.',
+            status: Response::HTTP_NOT_FOUND,
         );
     }
 

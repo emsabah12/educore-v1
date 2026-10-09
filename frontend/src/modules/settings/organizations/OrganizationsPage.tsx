@@ -7,9 +7,11 @@ import {
 
 import {
     useCreateOrganizationMutation,
+    useUpdateOrganizationMutation,
 } from '@/modules/settings/organizations/api/use-organization-mutations';
 import {
     useOrganizationsQuery,
+    type OrganizationResource,
 } from '@/modules/settings/organizations/api/use-organizations-query';
 import type {
     BrowserApiFailure,
@@ -262,6 +264,173 @@ function CreateOrganizationForm() {
     );
 }
 
+interface RenameOrganizationControlProps {
+    organization: OrganizationResource;
+}
+
+/*
+ * Inline rename control — mencegah duplikat Organization yang
+ * tidak sengaja (mis. default auto-created yang tidak dipakai)
+ * dengan memberi jalan resmi untuk mengganti nama Organization
+ * yang sudah ada, daripada admin membuat Organization baru lagi.
+ */
+function RenameOrganizationControl(
+    {
+        organization,
+    }: RenameOrganizationControlProps,
+) {
+    const [
+        isEditing,
+        setIsEditing,
+    ] = useState(false);
+
+    const [
+        name,
+        setName,
+    ] = useState(
+        organization.name,
+    );
+
+    const mutation =
+        useUpdateOrganizationMutation();
+
+    const nameErrorMessage =
+        mutation.isError
+            ? extractFieldErrorMessage(
+                mutation.error,
+                'name',
+            )
+            : null;
+
+    function startEditing() {
+        setName(
+            organization.name,
+        );
+
+        mutation.reset();
+
+        setIsEditing(true);
+    }
+
+    function cancelEditing() {
+        mutation.reset();
+
+        setIsEditing(false);
+    }
+
+    function handleSubmit(
+        event:
+            React.FormEvent,
+    ) {
+        event.preventDefault();
+
+        mutation.mutate(
+            {
+                organizationId:
+                    organization.id,
+
+                input: {
+                    name,
+                },
+            },
+            {
+                onSuccess: () => {
+                    setIsEditing(false);
+                },
+            },
+        );
+    }
+
+    if (! isEditing) {
+        return (
+            <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="ml-2"
+                onClick={startEditing}
+            >
+                Ganti Nama
+            </Button>
+        );
+    }
+
+    return (
+        <form
+            onSubmit={handleSubmit}
+            className="ml-2 inline-flex flex-col gap-1 align-top"
+        >
+            <div className="inline-flex items-center gap-2">
+                <label
+                    htmlFor={
+                        `organization-rename-${organization.id}`
+                    }
+                    className="sr-only"
+                >
+                    Nama Organisasi Baru
+                </label>
+
+                <Input
+                    id={
+                        `organization-rename-${organization.id}`
+                    }
+                    value={name}
+                    required
+                    aria-invalid={
+                        nameErrorMessage !== null
+                    }
+                    onChange={
+                        (
+                            event,
+                        ) =>
+                            setName(
+                                event.target.value,
+                            )
+                    }
+                />
+
+                <Button
+                    type="submit"
+                    size="sm"
+                    disabled={mutation.isPending}
+                >
+                    {
+                        mutation.isPending
+                            ? 'Menyimpan…'
+                            : 'Simpan'
+                    }
+                </Button>
+
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={mutation.isPending}
+                    onClick={cancelEditing}
+                >
+                    Batal
+                </Button>
+            </div>
+
+            {
+                mutation.isError
+                    ? (
+                        <p
+                            role="alert"
+                            className="text-xs text-destructive"
+                        >
+                            {
+                                nameErrorMessage
+                                ?? 'Gagal mengganti nama Organisasi. Coba lagi.'
+                            }
+                        </p>
+                    )
+                    : null
+            }
+        </form>
+    );
+}
+
 export function OrganizationsPage() {
     const organizationsQuery =
         useOrganizationsQuery();
@@ -426,6 +595,12 @@ export function OrganizationsPage() {
                                                                     Kelola Anggota
                                                                 </Link>
                                                             </Button>
+
+                                                            <RenameOrganizationControl
+                                                                organization={
+                                                                    organization
+                                                                }
+                                                            />
                                                         </TableCell>
                                                     </TableRow>
                                                 ),

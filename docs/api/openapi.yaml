@@ -8502,6 +8502,71 @@ paths:
         "500":
           $ref: "#/components/responses/InternalServerError"
 
+  /api/v1/core/organizations/{organization}:
+    put:
+      operationId: coreOrganizationUpdate
+      x-laravel-route-name: api.v1.core.organizations.update
+      tags:
+        - Core
+      summary: Rename one Organization belonging to the current tenant
+      description: |
+        Only `name` is editable here — this is a dedicated rename
+        action, not a general PATCH of every Organization
+        attribute. Lets an admin rename the Organization that
+        TenantActivationService auto-creates on tenant activation
+        (named after the Tenant) into the real school/unit name,
+        instead of leaving it unused and creating a second
+        Organization. An organization id that does not exist, or
+        that belongs to a different tenant, always returns 404,
+        identical to a non-existent one. Requires
+        organization.manage permission.
+      security:
+        - BearerAuth: []
+        - BrowserSessionAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CanonicalBrowserMembershipLocator"
+        - name: organization
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/UuidV7"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrganizationRequest"
+      responses:
+        "200":
+          description: The renamed Organization.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OrganizationDetailSuccess"
+
+        "401":
+          $ref: "#/components/responses/BrowserSessionAuthenticationRequired"
+
+        "403":
+          description: |
+            Authentication context missing/invalid, or the current
+            Membership does not have organization.manage permission.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/AuthenticationContextDeniedError"
+                  - $ref: "#/components/schemas/AuthorizationDeniedError"
+
+        "404":
+          $ref: "#/components/responses/ResourceNotFound"
+
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
+
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
   /api/v1/core/organizations/{organization}/units:
     get:
       operationId: coreOrganizationUnitIndex
@@ -13718,6 +13783,19 @@ components:
           maxLength: 100
           description: |
             Unik per tenant (bukan global). Boleh dikosongkan.
+
+    UpdateOrganizationRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 255
+          description: |
+            Trimmed before validation. No uniqueness constraint,
+            consistent with StoreOrganizationRequest.
 
     OrganizationUnitResource:
       type: object

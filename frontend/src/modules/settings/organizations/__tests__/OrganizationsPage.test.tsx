@@ -339,5 +339,165 @@ describe(
                 ).not.toBeInTheDocument();
             },
         );
+
+        it(
+            'renames an organization from the inline rename control',
+            async () => {
+                const renamedOrganization = {
+                    ...SAMPLE_ORGANIZATION,
+                    name: 'Kampus Pusat',
+                };
+
+                apiMockServer.use(
+                    http.get(
+                        '*/api/v1/core/organizations',
+                        () =>
+                            HttpResponse.json(
+                                {
+                                    status: 'success',
+                                    data: [SAMPLE_ORGANIZATION],
+                                },
+                            ),
+                    ),
+                    http.put(
+                        '*/api/v1/core/organizations/:organization',
+                        () =>
+                            HttpResponse.json(
+                                {
+                                    status: 'success',
+                                    data: renamedOrganization,
+                                },
+                            ),
+                    ),
+                );
+
+                renderOrganizationsPage();
+
+                await screen.findByText(
+                    'Kampus Utama',
+                );
+
+                fireEvent.click(
+                    screen.getByRole(
+                        'button',
+                        {
+                            name: 'Ganti Nama',
+                        },
+                    ),
+                );
+
+                const renameInput =
+                    screen.getByLabelText(
+                        'Nama Organisasi Baru',
+                    );
+
+                fireEvent.change(
+                    renameInput,
+                    {
+                        target: {
+                            value: 'Kampus Pusat',
+                        },
+                    },
+                );
+
+                fireEvent.click(
+                    screen.getByRole(
+                        'button',
+                        {
+                            name: 'Simpan',
+                        },
+                    ),
+                );
+
+                await waitFor(
+                    () => {
+                        expect(
+                            screen.queryByRole(
+                                'button',
+                                {
+                                    name: 'Simpan',
+                                },
+                            ),
+                        ).not.toBeInTheDocument();
+                    },
+                );
+
+                expect(
+                    screen.getByRole(
+                        'button',
+                        {
+                            name: 'Ganti Nama',
+                        },
+                    ),
+                ).toBeInTheDocument();
+            },
+        );
+
+        it(
+            'shows the field-level validation message when the renamed value is blank',
+            async () => {
+                apiMockServer.use(
+                    http.get(
+                        '*/api/v1/core/organizations',
+                        () =>
+                            HttpResponse.json(
+                                {
+                                    status: 'success',
+                                    data: [SAMPLE_ORGANIZATION],
+                                },
+                            ),
+                    ),
+                    http.put(
+                        '*/api/v1/core/organizations/:organization',
+                        () =>
+                            HttpResponse.json(
+                                {
+                                    status: 'error',
+                                    code: 'VALIDATION_FAILED',
+                                    message: 'The submitted data is invalid.',
+                                    errors: {
+                                        name: [
+                                            'The organization name is required.',
+                                        ],
+                                    },
+                                },
+                                {
+                                    status: 422,
+                                },
+                            ),
+                    ),
+                );
+
+                renderOrganizationsPage();
+
+                await screen.findByText(
+                    'Kampus Utama',
+                );
+
+                fireEvent.click(
+                    screen.getByRole(
+                        'button',
+                        {
+                            name: 'Ganti Nama',
+                        },
+                    ),
+                );
+
+                fireEvent.click(
+                    screen.getByRole(
+                        'button',
+                        {
+                            name: 'Simpan',
+                        },
+                    ),
+                );
+
+                expect(
+                    await screen.findByText(
+                        'The organization name is required.',
+                    ),
+                ).toBeInTheDocument();
+            },
+        );
     },
 );

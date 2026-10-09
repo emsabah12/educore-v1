@@ -155,6 +155,171 @@ final class OrganizationManagementControllerTest extends TestCase
         $response->assertStatus(Response::HTTP_CREATED);
     }
 
+    public function test_update_renames_organization(): void
+    {
+        $organizationId = $this->createOrganizationFixture(
+            $this->tenantId,
+            'Yayasan Angin Ribut',
+            null,
+        );
+
+        $response = $this
+            ->withToken($this->issueToken())
+            ->putJson(
+                route(
+                    'api.v1.core.organizations.update',
+                    ['organization' => $organizationId],
+                    false,
+                ),
+                [
+                    'name' => 'SMP Angin Ribut',
+                ],
+            );
+
+        $response->assertOk();
+        $response->assertJsonPath('data.id', $organizationId);
+        $response->assertJsonPath('data.name', 'SMP Angin Ribut');
+
+        $this->assertDatabaseHas('organizations', [
+            'id' => $organizationId,
+            'tenant_id' => $this->tenantId,
+            'name' => 'SMP Angin Ribut',
+        ]);
+    }
+
+    public function test_update_trims_the_renamed_value(): void
+    {
+        $organizationId = $this->createOrganizationFixture(
+            $this->tenantId,
+            'Yayasan Angin Ribut',
+            null,
+        );
+
+        $response = $this
+            ->withToken($this->issueToken())
+            ->putJson(
+                route(
+                    'api.v1.core.organizations.update',
+                    ['organization' => $organizationId],
+                    false,
+                ),
+                [
+                    'name' => '  SMP Angin Ribut  ',
+                ],
+            );
+
+        $response->assertOk();
+        $response->assertJsonPath('data.name', 'SMP Angin Ribut');
+    }
+
+    public function test_update_rejects_blank_name(): void
+    {
+        $organizationId = $this->createOrganizationFixture(
+            $this->tenantId,
+            'Yayasan Angin Ribut',
+            null,
+        );
+
+        $response = $this
+            ->withToken($this->issueToken())
+            ->putJson(
+                route(
+                    'api.v1.core.organizations.update',
+                    ['organization' => $organizationId],
+                    false,
+                ),
+                [
+                    'name' => '',
+                ],
+            );
+
+        $response->assertStatus(Response::HTTP_UNPROCESSABLE_ENTITY);
+
+        $this->assertDatabaseHas('organizations', [
+            'id' => $organizationId,
+            'name' => 'Yayasan Angin Ribut',
+        ]);
+    }
+
+    public function test_update_returns_not_found_for_nonexistent_organization(): void
+    {
+        $response = $this
+            ->withToken($this->issueToken())
+            ->putJson(
+                route(
+                    'api.v1.core.organizations.update',
+                    ['organization' => UuidV7::generate()],
+                    false,
+                ),
+                [
+                    'name' => 'SMP Angin Ribut',
+                ],
+            );
+
+        $response->assertStatus(Response::HTTP_NOT_FOUND);
+    }
+
+    public function test_update_returns_not_found_for_organization_belonging_to_another_tenant(): void
+    {
+        $otherTenantId = UuidV7::generate();
+        $this->createTenantFixture($otherTenantId);
+
+        $otherOrganizationId = $this->createOrganizationFixture(
+            $otherTenantId,
+            'Milik Tenant Lain',
+            null,
+        );
+
+        $response = $this
+            ->withToken($this->issueToken())
+            ->putJson(
+                route(
+                    'api.v1.core.organizations.update',
+                    ['organization' => $otherOrganizationId],
+                    false,
+                ),
+                [
+                    'name' => 'Diganti Paksa',
+                ],
+            );
+
+        $response->assertStatus(Response::HTTP_NOT_FOUND);
+
+        $this->assertDatabaseHas('organizations', [
+            'id' => $otherOrganizationId,
+            'tenant_id' => $otherTenantId,
+            'name' => 'Milik Tenant Lain',
+        ]);
+    }
+
+    public function test_update_is_forbidden_without_organization_manage_permission(): void
+    {
+        $organizationId = $this->createOrganizationFixture(
+            $this->tenantId,
+            'Yayasan Angin Ribut',
+            null,
+        );
+
+        DB::table('membership_roles')
+            ->where('membership_id', $this->operatorMembershipId)
+            ->delete();
+
+        $response = $this
+            ->withToken($this->issueToken())
+            ->putJson(
+                route(
+                    'api.v1.core.organizations.update',
+                    ['organization' => $organizationId],
+                    false,
+                ),
+                [
+                    'name' => 'SMP Angin Ribut',
+                ],
+            );
+
+        $response->assertStatus(Response::HTTP_FORBIDDEN);
+    }
+
     public function test_index_accepts_browser_session_without_exposing_bearer(): void
     {
         config(['session.driver' => 'array']);
@@ -306,9 +471,11 @@ final class OrganizationManagementControllerTest extends TestCase
         string $tenantId,
         string $name,
         ?string $code,
-    ): void {
+    ): string {
+        $organizationId = UuidV7::generate();
+
         DB::table('organizations')->insert([
-            'id' => UuidV7::generate(),
+            'id' => $organizationId,
             'tenant_id' => $tenantId,
             'name' => $name,
             'code' => $code,
@@ -316,5 +483,7 @@ final class OrganizationManagementControllerTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        return $organizationId;
     }
 }
